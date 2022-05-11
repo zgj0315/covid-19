@@ -3,8 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use serde::{Deserialize, Serialize};
 use tokio::io::AsyncBufReadExt;
-
 pub async fn read_file_and_input_buffer(src_dir: &String, line_buf: Arc<Mutex<Vec<String>>>) {
     let path = Path::new(src_dir);
     for entry in path.read_dir().expect("read_dir call failed") {
@@ -53,7 +53,34 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
             line_list.remove(0);
             drop(line_list);
             sleep_time = 0;
-            println!("{}", line);
+            // println!("{}", &line);
+            let mut rdr = csv::ReaderBuilder::new()
+                .has_headers(false)
+                .from_reader(line.as_bytes());
+            for result in rdr.deserialize() {
+                let record: Covid19DailyReport = result.unwrap();
+                if record.clone().fips.is_some() && record.clone().fips.unwrap().eq("FIPS") {
+                    println!("{:?}", record);
+                }
+            }
         }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct Covid19DailyReport {
+    fips: Option<String>,                //美国境内县代码
+    admin2: Option<String>,              //美国境内县名
+    province_state: Option<String>,      //省
+    country_region: Option<String>,      //国家
+    last_update: Option<String>,         //最后更新时间
+    lat: Option<String>,                 //纬度
+    long_: Option<String>,               //经度
+    confirmed: Option<String>,           //累计确诊人数
+    deaths: Option<String>,              //累计死亡人数
+    recovered: Option<String>,           //累计康复人数
+    active: Option<String>,              //当前活跃病例，病例总数-康复总数-死亡总数
+    combined_key: Option<String>,        //省+国家
+    incident_rate: Option<String>,       //发病率，每十万人的病例数
+    case_fatality_ratio: Option<String>, //病死率，死亡人数/病例数
 }
