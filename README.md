@@ -15,3 +15,7 @@ RUST
 - [ ] grafana安装部署
 - [ ] rust程序设计开发
 - [ ] dashboard设计开发
+
+### rust程序设计
+- [x] 异步架构
+- [x] 单线程运行
