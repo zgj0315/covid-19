@@ -18,11 +18,11 @@ async fn main() {
         src_dir = &args[1];
     }
     // 原始数据缓存，一行数据
-    let line_buffer = Arc::new(Mutex::new(Vec::new()));
+    let line_buf = Arc::new(Mutex::new(Vec::new()));
     // 读取一行，写入缓存
-    let future_read_file = read_file_and_input_buffer(src_dir, line_buffer.clone());
+    let future_read_file = read_file_and_input_buffer(src_dir, line_buf.clone());
     // 读取缓存，写入CH
-    let future_write_db = read_buffer_and_input_db(line_buffer.clone());
+    let future_write_db = read_buffer_and_input_db(line_buf.clone());
     // join
     tokio::join!(future_read_file, future_write_db);
 }
