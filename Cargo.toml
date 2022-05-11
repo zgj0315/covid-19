@@ -4,3 +4,4 @@ name = "covid-19"
 version = "0.1.0"
 
 [dependencies]
+tokio = {version = "1.17.0", features = ["full"]}
