@@ -19,6 +19,7 @@ RUST
 ### rust程序设计
 - [x] 异步架构
 - [x] 单线程运行
+- [ ] rust操作clickhouse的三方包选型
 
 ### clieckhouse安装部署
 ```
@@ -57,6 +58,13 @@ CREATE TABLE covid_19.daily_reports
 )
 ENGINE = MergeTree()
 PRIMARY KEY (province_state, country_region, last_update)
+
+CREATE TABLE covid_19.tbl_test
+(
+    fips String
+)
+ENGINE = MergeTree()
+PRIMARY KEY (fips)
 ```
 
 ### grafana安装部署
