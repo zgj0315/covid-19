@@ -156,6 +156,7 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
     }
     inserter.end().await.unwrap();
     // insert.end().await.unwrap();
+    println!("job finished, data count: {}", count);
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Row)]
