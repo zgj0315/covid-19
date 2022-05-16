@@ -13,13 +13,13 @@ RUST
 ## TodoList
 - [x] clickhouse安装部署
 - [x] grafana安装部署
-- [ ] rust程序设计开发
+- [x] rust程序设计开发
 - [x] dashboard设计开发
 ## 技术方案
 ### rust程序设计
 - [x] 异步架构
 - [x] 单线程运行
-- [ ] rust操作clickhouse的三方包选型
+- [x] rust操作clickhouse的三方包选型
 
 ### clieckhouse安装部署
 ```
@@ -37,35 +37,6 @@ chmod a+x clickhouse
 
 # 创建数据库
 CREATE DATABASE IF NOT EXISTS covid_19
-
-# 创建数据表
-CREATE TABLE covid_19.daily_reports
-(
-    fips String,
-    admin2 String,
-    province_state String,
-    country_region String,
-    last_update DateTime,
-    lat Float32,
-    long_ Float32,
-    confirmed UInt32,
-    deaths UInt32,
-    recovered UInt32,
-    active UInt32,
-    combined_key String,
-    incident_rate Float32,
-    case_fatality_ratio Float32
-)
-ENGINE = MergeTree()
-PRIMARY KEY (province_state, country_region, last_update)
-
-CREATE TABLE covid_19.tbl_test
-(
-    fips String
-)
-ENGINE = MergeTree()
-PRIMARY KEY (fips)
-```
 
 ### grafana安装部署
 ```

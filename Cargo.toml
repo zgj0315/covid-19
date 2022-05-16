@@ -4,8 +4,8 @@ name = "covid-19"
 version = "0.1.0"
 
 [dependencies]
+chrono = "0.4.19"
 clickhouse = "0.10.0"
 csv = "1.1.6"
 serde = {version = "1.0.137", features = ["derive"]}
-serde_repr = "0.1"
 tokio = {version = "1.17.0", features = ["full"]}

@@ -1,8 +1,10 @@
 use std::{
     path::Path,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
+use chrono::Local;
 use clickhouse::{error::Result, Client, Row};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncBufReadExt;
@@ -23,7 +25,7 @@ pub async fn read_file_and_input_buffer(src_dir: &String, line_buf: Arc<Mutex<Ve
                 while let Some(line) = buf_reader.next_line().await.unwrap() {
                     loop {
                         let mut line_list = line_buf.lock().unwrap();
-                        if line_list.len() < 10 {
+                        if line_list.len() < 10000 {
                             line_list.push(line);
                             drop(line_list);
                             break;
@@ -43,9 +45,15 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
         .with_url("http://127.0.0.1:8123")
         .with_database("covid_19");
     ddl(&client).await.unwrap();
-    // insert(&client).await.unwrap();
-    let mut inserter = client.inserter("daily_reports").unwrap();
+    let mut inserter = client
+        .inserter("daily_reports")
+        .unwrap()
+        .with_max_entries(100_000)
+        .with_max_duration(Duration::from_secs(15));
+    // let mut insert = client.insert("daily_reports").unwrap();
     let mut sleep_time = 0;
+    let mut count = 0;
+    let mut last_time = Local::now().timestamp_millis();
     loop {
         let mut line_list = line_buf.lock().unwrap();
         if line_list.is_empty() {
@@ -69,6 +77,16 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
                     if record.fips.is_some() && record.clone().fips.unwrap().eq("FIPS") {
                         // println!("this is header, {:?}", record);
                     } else {
+                        count += 1;
+                        let now = Local::now().timestamp_millis();
+                        if count % 10000 == 0 {
+                            println!(
+                                "data count: {}, speed: {}row/s",
+                                count,
+                                (10000 * 1000) / (now - last_time)
+                            );
+                            last_time = now;
+                        }
                         // println!("{:?}", &record);
                         let report = DailyReport {
                             fips: match record.fips {
@@ -130,12 +148,14 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
                         };
                         inserter.write(&report).await.unwrap();
                         inserter.commit().await.unwrap();
+                        // insert.write(&report).await.unwrap();
                     }
                 }
             }
         }
     }
     inserter.end().await.unwrap();
+    // insert.end().await.unwrap();
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Row)]
