@@ -10,16 +10,17 @@ RUST
 2. rust程序读取新冠数据，入库到clickhouse
 3. grafana进行数据可视化
 
-## TodoList
-- [x] clickhouse安装部署
-- [x] grafana安装部署
-- [x] rust程序设计开发
-- [x] dashboard设计开发
 ## 技术方案
 ### rust程序设计
 - [x] 异步架构
 - [x] 单线程运行
-- [x] rust操作clickhouse的三方包选型
+
+### 速度测试
+Processor 2 GHz Quad-Core Intel Core i5  
+Memory 16GB 3733 MHz LPDDR4x  
+SSD  
+rust程序，单线程，非批量入库  
+1.3万条/秒
 
 ### clieckhouse安装部署
 ```
