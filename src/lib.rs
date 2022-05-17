@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use chrono::Local;
+use chrono::{Local, TimeZone, Utc};
 use clickhouse::{error::Result, Client, Row};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncBufReadExt;
@@ -46,11 +46,11 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
         .with_database("covid_19");
     ddl(&client).await.unwrap();
     let mut inserter = client
-        .inserter("daily_reports")
+        .inserter("daily_report")
         .unwrap()
         .with_max_entries(100_000)
         .with_max_duration(Duration::from_secs(15));
-    // let mut insert = client.insert("daily_reports").unwrap();
+    // let mut insert = client.insert("daily_report").unwrap();
     let mut sleep_time = 0;
     let mut count = 0;
     let mut last_time = Local::now().timestamp_millis();
@@ -105,9 +105,34 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
                                 Some(value) => value,
                                 None => "".to_string(),
                             },
+                            // Some(value) => Utc
+                            // .datetime_from_str(&value, "%Y-%m-%d %H:%M:%S")
+                            // .unwrap()
+                            // .timestamp(),
                             last_update: match record.last_update {
-                                Some(value) => value,
-                                None => "".to_string(),
+                                Some(value) => {
+                                    if value.len() == 19 {
+                                        match Utc.datetime_from_str(&value, "%Y-%m-%d %H:%M:%S") {
+                                            Ok(utc) => utc.timestamp(),
+                                            Err(err) => {
+                                                println!("err: {}, value: {}", err, value);
+                                                0
+                                            }
+                                        }
+                                    } else if value.len() == 16 {
+                                        match Utc.datetime_from_str(&value, "%Y-%m-%d %H:%M") {
+                                            Ok(utc) => utc.timestamp(),
+                                            Err(err) => {
+                                                println!("err: {}, value: {}", err, value);
+                                                0
+                                            }
+                                        }
+                                    } else {
+                                        println!("value is err, {}", value);
+                                        0
+                                    }
+                                }
+                                None => 0,
                             },
                             lat: match record.lat {
                                 Some(value) => value,
@@ -183,7 +208,7 @@ pub struct DailyReport {
     admin2: String,           //美国境内县名
     province_state: String,   //省
     country_region: String,   //国家
-    last_update: String,      //最后更新时间
+    last_update: i64,         //最后更新时间
     lat: f32,                 //纬度
     long_: f32,               //经度
     confirmed: u32,           //累计确诊人数
@@ -197,19 +222,19 @@ pub struct DailyReport {
 
 async fn ddl(client: &Client) -> Result<()> {
     client
-        .query("DROP TABLE IF EXISTS daily_reports")
+        .query("DROP TABLE IF EXISTS daily_report")
         .execute()
         .await?;
     client
         .query(
             "
-            CREATE TABLE covid_19.daily_reports
+            CREATE TABLE covid_19.daily_report
             (
                 fips String,
                 admin2 String,
                 province_state String,
                 country_region String,
-                last_update String,
+                last_update DateTime64(0),
                 lat Float32,
                 long_ Float32,
                 confirmed UInt32,
