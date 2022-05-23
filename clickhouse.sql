@@ -1,3 +1,12 @@
+# 北京确诊人数走势
+SELECT
+    confirmed,
+    last_update
+FROM covid_19.daily_report
+WHERE (country_region = 'China') AND (province_state = 'Beijing')
+ORDER BY last_update ASC
+LIMIT 1000
+
 # 最新数据
 SELECT *
 FROM covid_19.daily_report
