@@ -31,7 +31,7 @@ pub async fn read_file_and_input_buffer(src_dir: &String, line_buf: Arc<Mutex<Ve
                             break;
                         } else {
                             drop(line_list);
-                            tokio::time::sleep(tokio::time::Duration::from_millis(3)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
                         }
                     }
                 }
@@ -171,15 +171,15 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
                                 None => 0.0,
                             },
                         };
-                        inserter.write(&report).await.unwrap();
-                        inserter.commit().await.unwrap();
+                        let _ = inserter.write(&report).await;
+                        let _ = inserter.commit().await;
                         // insert.write(&report).await.unwrap();
                     }
                 }
             }
         }
     }
-    inserter.end().await.unwrap();
+    let _ = inserter.end().await;
     // insert.end().await.unwrap();
     println!("job finished, data count: {}", count);
 }
