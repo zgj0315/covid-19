@@ -54,4 +54,7 @@ tar zxvf grafana-enterprise-8.5.2.darwin-amd64.tar.gz
 http://127.0.0.1:3000
 admin/admin
 
+# 入库数据
+target/release/covid-19 ../../CSSEGISandData/COVID-19/csse_covid_19_data/csse_covid_19_daily_reports
+
 ```
