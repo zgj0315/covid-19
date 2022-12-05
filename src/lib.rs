@@ -8,7 +8,7 @@ use chrono::{Local, TimeZone, Utc};
 use clickhouse::{error::Result, Client, Row};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncBufReadExt;
-pub async fn read_file_and_input_buffer(src_dir: &String, line_buf: Arc<Mutex<Vec<String>>>) {
+pub async fn read_file_and_input_buffer(src_dir: &str, line_buf: Arc<Mutex<Vec<String>>>) {
     let path = Path::new(src_dir);
     for entry in path.read_dir().expect("read_dir call failed") {
         if let Ok(entry) = entry {
@@ -31,7 +31,7 @@ pub async fn read_file_and_input_buffer(src_dir: &String, line_buf: Arc<Mutex<Ve
                             break;
                         } else {
                             drop(line_list);
-                            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
                         }
                     }
                 }
@@ -49,8 +49,7 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
         .inserter("daily_report")
         .unwrap()
         .with_max_entries(100_000)
-        .with_max_duration(Duration::from_secs(15));
-    // let mut insert = client.insert("daily_report").unwrap();
+        .with_period(Some(Duration::from_secs(15)));
     let mut sleep_time = 0;
     let mut count = 0;
     let mut last_time = Local::now().timestamp_millis();
@@ -75,19 +74,17 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
                 if result.is_ok() {
                     let record: Covid19DailyReportCSV = result.unwrap();
                     if record.fips.is_some() && record.clone().fips.unwrap().eq("FIPS") {
-                        // println!("this is header, {:?}", record);
                     } else {
                         count += 1;
                         let now = Local::now().timestamp_millis();
                         if count % 10000 == 0 {
-                            println!(
+                            log::info!(
                                 "data count: {}, speed: {}row/s",
                                 count,
                                 (10000 * 1000) / (now - last_time)
                             );
                             last_time = now;
                         }
-                        // println!("{:?}", &record);
                         let report = DailyReport {
                             fips: match record.fips {
                                 Some(value) => value,
@@ -105,17 +102,13 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
                                 Some(value) => value,
                                 None => "".to_string(),
                             },
-                            // Some(value) => Utc
-                            // .datetime_from_str(&value, "%Y-%m-%d %H:%M:%S")
-                            // .unwrap()
-                            // .timestamp(),
                             last_update: match record.last_update {
                                 Some(value) => {
                                     if value.len() == 19 {
                                         match Utc.datetime_from_str(&value, "%Y-%m-%d %H:%M:%S") {
                                             Ok(utc) => utc.timestamp(),
                                             Err(err) => {
-                                                println!("err: {}, value: {}", err, value);
+                                                log::error!("err: {}, value: {}", err, value);
                                                 0
                                             }
                                         }
@@ -123,12 +116,12 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
                                         match Utc.datetime_from_str(&value, "%Y-%m-%d %H:%M") {
                                             Ok(utc) => utc.timestamp(),
                                             Err(err) => {
-                                                println!("err: {}, value: {}", err, value);
+                                                log::error!("err: {}, value: {}", err, value);
                                                 0
                                             }
                                         }
                                     } else {
-                                        println!("value is err, {}", value);
+                                        log::error!("value is err, {}", value);
                                         0
                                     }
                                 }
@@ -172,16 +165,14 @@ pub async fn read_buffer_and_input_db(line_buf: Arc<Mutex<Vec<String>>>) {
                             },
                         };
                         let _ = inserter.write(&report).await;
-                        let _ = inserter.commit().await;
-                        // insert.write(&report).await.unwrap();
+                        let _ = inserter.commit().await; // 取消每次的commit，确认是否会提速
                     }
                 }
             }
         }
     }
     let _ = inserter.end().await;
-    // insert.end().await.unwrap();
-    println!("job finished, data count: {}", count);
+    log::info!("job finished, data count: {}", count);
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Row)]
