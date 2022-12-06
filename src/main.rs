@@ -1,11 +1,15 @@
+mod lib;
 use std::{
     env,
+    path::Path,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
-use covid_19::{read_buffer_and_input_db, read_file_and_input_buffer};
+use lib::{init_tbl, put_into_db};
+use tokio::{join, time::sleep};
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() {
     let format = tracing_subscriber::fmt::format()
         .with_level(true)
@@ -26,12 +30,47 @@ async fn main() {
     } else {
         src_dir = &args[1];
     }
-    // 原始数据缓存，一行数据
-    let line_buf = Arc::new(Mutex::new(Vec::new()));
-    // 读取一行，写入缓存
-    let future_read_file = read_file_and_input_buffer(src_dir, Arc::clone(&line_buf));
-    // 读取缓存，写入CH
-    let future_write_db = read_buffer_and_input_db(Arc::clone(&line_buf));
-    // join
-    tokio::join!(future_read_file, future_write_db);
+    let future = init_tbl();
+    let _ = join!(future);
+    let num_cpus = num_cpus::get_physical();
+    let thread_counter = Arc::new(Mutex::new(0));
+    let path = Path::new(src_dir);
+    for entry in path.read_dir().unwrap() {
+        let entry = entry.unwrap();
+        let csv_path = entry.path();
+        if csv_path.is_file() {
+            let file_name = csv_path.to_str().unwrap();
+            // log::info!("csv_path: {:?}", csv_path);
+            let (_, file_name) = file_name.rsplit_once("/").unwrap();
+            if file_name.ends_with(".csv") {
+                let thread_counter = Arc::clone(&thread_counter);
+                loop {
+                    let mut thread_count = thread_counter.lock().unwrap();
+                    if *thread_count < num_cpus {
+                        *thread_count += 1;
+                        drop(thread_count);
+                        tokio::spawn(async move {
+                            let future = put_into_db(&csv_path, Arc::clone(&thread_counter));
+                            let _ = join!(future);
+                        });
+                        break;
+                    } else {
+                        drop(thread_count);
+                        sleep(Duration::from_millis(100)).await;
+                    }
+                }
+            }
+        }
+    }
+    let thread_counter = Arc::clone(&thread_counter);
+    loop {
+        let thread_count = thread_counter.lock().unwrap();
+        if *thread_count > 0 {
+            drop(thread_count);
+            sleep(Duration::from_millis(1000)).await;
+        } else {
+            drop(thread_count);
+            break;
+        }
+    }
 }
