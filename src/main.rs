@@ -6,8 +6,9 @@ use std::{
     time::Duration,
 };
 
+use chrono::Local;
 use lib::{init_tbl, put_into_db};
-use tokio::{join, time::sleep};
+use tokio::{join, sync::mpsc, time::sleep};
 
 #[tokio::main]
 async fn main() {
@@ -34,23 +35,39 @@ async fn main() {
     let _ = join!(future);
     let num_cpus = num_cpus::get_physical();
     let thread_counter = Arc::new(Mutex::new(0));
+    let (tx, mut rx) = mpsc::channel(128);
+    tokio::spawn(async move {
+        let mut last_time = Local::now().timestamp_millis();
+        let mut sum: i32 = 0;
+        while let Some(count) = rx.recv().await {
+            sum += count;
+            let now = Local::now().timestamp_millis();
+            let time: i32 = (now - last_time).try_into().unwrap();
+            if time > 1000 * 3 {
+                last_time = now;
+                log::info!("speed: {}/s", (sum * 1000) / time);
+                sum = 0;
+                sleep(Duration::from_secs(3)).await;
+            }
+        }
+    });
     let path = Path::new(src_dir);
     for entry in path.read_dir().unwrap() {
         let entry = entry.unwrap();
         let csv_path = entry.path();
         if csv_path.is_file() {
             let file_name = csv_path.to_str().unwrap();
-            // log::info!("csv_path: {:?}", csv_path);
             let (_, file_name) = file_name.rsplit_once("/").unwrap();
             if file_name.ends_with(".csv") {
                 let thread_counter = Arc::clone(&thread_counter);
+                let tx = tx.clone();
                 loop {
                     let mut thread_count = thread_counter.lock().unwrap();
                     if *thread_count < num_cpus {
                         *thread_count += 1;
                         drop(thread_count);
                         tokio::spawn(async move {
-                            let future = put_into_db(&csv_path, Arc::clone(&thread_counter));
+                            let future = put_into_db(&csv_path, Arc::clone(&thread_counter), tx);
                             let _ = join!(future);
                         });
                         break;

@@ -7,7 +7,7 @@ use std::{
 use chrono::{Local, TimeZone};
 use clickhouse::{Client, Row};
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncBufReadExt;
+use tokio::{io::AsyncBufReadExt, sync::mpsc::Sender};
 
 #[derive(Debug, Deserialize, Serialize, Clone, Row)]
 struct DailyReport {
@@ -65,7 +65,7 @@ pub async fn init_tbl() {
         .unwrap();
 }
 
-pub async fn put_into_db(csv_path: &Path, thread_counter: Arc<Mutex<usize>>) {
+pub async fn put_into_db(csv_path: &Path, thread_counter: Arc<Mutex<usize>>, tx: Sender<i32>) {
     let client = Client::default()
         .with_url("http://127.0.0.1:8123")
         .with_database("covid_19");
@@ -266,7 +266,8 @@ pub async fn put_into_db(csv_path: &Path, thread_counter: Arc<Mutex<usize>>) {
         count += 1;
     }
     let _ = inserter.end().await.unwrap();
-    log::info!("put into db data count: {}", count);
+    tx.send(count).await.unwrap();
+    drop(tx);
     let mut thread_count = thread_counter.lock().unwrap();
     *thread_count -= 1;
     drop(thread_count);
@@ -279,7 +280,7 @@ mod tests {
         sync::{Arc, Mutex},
     };
 
-    use tokio::join;
+    use tokio::{join, sync::mpsc};
 
     use super::{init_tbl, put_into_db};
 
@@ -289,10 +290,11 @@ mod tests {
         let _ = join!(future);
         let path = Path::new("../../CSSEGISandData/COVID-19/csse_covid_19_data/csse_covid_19_daily_reports/06-12-2022.csv");
         let thread_counter = Arc::new(Mutex::new(0));
+        let (tx, _) = mpsc::channel(128);
         let mut thread_count = thread_counter.lock().unwrap();
         *thread_count += 1;
         drop(thread_count);
-        let future = put_into_db(&path, Arc::clone(&thread_counter));
+        let future = put_into_db(&path, Arc::clone(&thread_counter), tx);
         let _ = join!(future);
     }
 }
