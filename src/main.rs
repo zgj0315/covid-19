@@ -47,7 +47,6 @@ async fn main() {
                 last_time = now;
                 log::info!("speed: {}/s", (sum * 1000) / time);
                 sum = 0;
-                sleep(Duration::from_secs(3)).await;
             }
         }
     });
